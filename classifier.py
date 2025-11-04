@@ -193,11 +193,44 @@ def batch_predict(test_dir: str, model_path: str = MODEL_PATH):
     return results
 
 
+def _normalize_plant_name(name: str) -> str:
+    mapping = {
+        "tomato": "Tomato",
+        "bell_pepper": "Bell_pepper",
+        "bell pepper": "Bell_pepper",
+        "bell-pepper": "Bell_pepper",
+        "eggplant": "Eggplant",
+        "none": "None",
+    }
+    key = (name or "").strip().lower()
+    return mapping.get(key, name)
+
+
+def validate_and_predict(image_path: str, plant_type: str, land_size: str | float | int, model_path: str = MODEL_PATH):
+    """
+    Run classifier, compare predicted plant with provided plant_type, and return a structured result.
+    Returns a JSON string with: ok(bool), predicted_label, input_plant, land_size, message.
+    """
+    input_plant_norm = _normalize_plant_name(plant_type)
+    predicted_label = predict(image_path, model_path=model_path)
+    ok = (predicted_label == input_plant_norm)
+    msg = "OK: Plant type matches, proceed to analysis." if ok else f"Mismatch: predicted '{predicted_label}' vs input '{input_plant_norm}'."
+    result = {
+        "ok": ok,
+        "predicted_label": predicted_label,
+        "input_plant": input_plant_norm,
+        "land_size": land_size,
+        "message": msg,
+    }
+    return json.dumps(result, indent=2)
+
+
 def main():
     """CLI interface."""
     if len(sys.argv) < 2:
         print("Usage:")
         print("  Single image: python classifier.py <image_path> [model_path]")
+        print("  With validation: python classifier.py <image_path> --plant <plant_type> --land <size> [model_path]")
         print("  Batch inference: python classifier.py --batch <test_dir> [model_path]")
         sys.exit(1)
     
@@ -240,9 +273,27 @@ def main():
         print("="*60)
         
     else:
-        # Single image mode
+        # Single image mode with optional validation
         image_path = sys.argv[1]
-        model_path = sys.argv[2] if len(sys.argv) > 2 else MODEL_PATH
+        # Parse optional flags
+        args = sys.argv[2:]
+        model_path = MODEL_PATH
+        plant_arg = None
+        land_arg = None
+        i = 0
+        while i < len(args):
+            if args[i] == "--plant" and i + 1 < len(args):
+                plant_arg = args[i + 1]
+                i += 2
+                continue
+            if args[i] == "--land" and i + 1 < len(args):
+                land_arg = args[i + 1]
+                i += 2
+                continue
+            # fallback: treat as model_path if not a flag
+            if not args[i].startswith("--"):
+                model_path = args[i]
+            i += 1
         
         image_path_obj = Path(image_path)
         
@@ -250,13 +301,11 @@ def main():
             print(f"Error: Path not found: {image_path}")
             sys.exit(1)
         
-        # Check if it's a directory
         if image_path_obj.is_dir():
             print(f"Error: '{image_path}' is a directory, not an image file.")
             print("For batch inference on a directory, use: python classifier.py --batch <directory>")
             sys.exit(1)
         
-        # Check if it's a file (not necessarily an image, but let PIL handle that)
         if not image_path_obj.is_file():
             print(f"Error: '{image_path}' is not a valid file.")
             sys.exit(1)
@@ -265,8 +314,13 @@ def main():
             print(f"Error: Model directory not found: {model_path}")
             sys.exit(1)
         
-        result_json = predict_json(image_path, model_path)
-        print(result_json)
+        # If plant and land provided, run validation flow; else standard single-image JSON label
+        if plant_arg is not None and land_arg is not None:
+            out = validate_and_predict(image_path, plant_arg, land_arg, model_path)
+            print(out)
+        else:
+            result_json = predict_json(image_path, model_path)
+            print(result_json)
 
 
 if __name__ == "__main__":

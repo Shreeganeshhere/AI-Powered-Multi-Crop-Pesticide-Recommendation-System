@@ -21,6 +21,9 @@ document.addEventListener("DOMContentLoaded", () => {
         weatherDetails: document.getElementById("weather-details") 
     };
     const fileInput = document.getElementById('leaf-image');
+    const plantTypeSelect = document.getElementById('plant-type');
+    const landSizeInput = document.getElementById('land-size');
+    const landUnitSelect = document.getElementById('land-unit');
     
     // Find the span element where the text should go
     // .closest() finds the nearest parent with this class
@@ -63,28 +66,56 @@ document.addEventListener("DOMContentLoaded", () => {
             const latitude = position.coords.latitude;
             const longitude = position.coords.longitude;
 
-            // --- Step B: Get All Form Data ---
-            // This automatically grabs all inputs from your form
-            const formData = new FormData(analysisForm);
+            // --- Step B: Build FormData for backend /analyze ---
+            const formData = new FormData();
+            // Image (required)
+            if (!fileInput.files || fileInput.files.length === 0) {
+                throw new Error('Please choose an image.');
+            }
+            formData.append('image', fileInput.files[0]);
+            // Plant type mapping to backend canonical values
+            const plantRaw = (plantTypeSelect.value || '').toLowerCase();
+            let plantCanonical = '';
+            if (plantRaw === 'tomato') plantCanonical = 'Tomato';
+            else if (plantRaw === 'eggplant') plantCanonical = 'Eggplant';
+            // Treat capsicum as bell pepper
+            else if (plantRaw === 'capsicum') plantCanonical = 'Bell_pepper';
+            else plantCanonical = plantRaw; // fallback
+            formData.append('plant_type', plantCanonical);
+            // Land size (include unit for readability)
+            const landSizeVal = landSizeInput.value;
+            const landUnitVal = landUnitSelect.value;
+            formData.append('land_size', `${landSizeVal} ${landUnitVal}`);
             
             // Add the location data to the FormData
             formData.append("lat", latitude);
             formData.append("lon", longitude);
 
             // --- Step C: Call the FastAPI Backend ---
-            const response = await fetch("http://127.0.0.1:8000/predict_recommendation", {
+            // Use /analyze endpoint that validates plant mismatch
+            const response = await fetch("http://127.0.0.1:8000/analyze", {
                 method: "POST",
                 body: formData,
             });
 
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || "Analysis failed");
+                // Expecting {detail: "..."}
+                let message = 'Analysis failed';
+                try {
+                    const errorData = await response.json();
+                    message = errorData.detail || message;
+                } catch {}
+                throw new Error(message);
             }
 
             const data = await response.json();
 
-            // --- Step D: Populate results and show them ---
+            // --- Step D: If backend returned ok=false (defensive), treat as error ---
+            if (data && data.ok === false && data.message) {
+                throw new Error(data.message);
+            }
+
+            // Populate results and show them (adjust according to your API response)
             populateResults(data);
             
             loadingScreen.classList.add("hidden");
