@@ -3,12 +3,12 @@ import shutil
 import random
 
 # Paths
-src = "/Users/shreeganeshnayak/Github-projects/AI-Powered-Multi-Crop-Pesticide-Recommendation-System/data/vegetables/sugarcane"
-dst_train = "/Users/shreeganeshnayak/Github-projects/AI-Powered-Multi-Crop-Pesticide-Recommendation-System/data/vegetables/train/None"
-dst_val = "/Users/shreeganeshnayak/Github-projects/AI-Powered-Multi-Crop-Pesticide-Recommendation-System/data/vegetables/val/None"
+src = "/Users/shreeganeshnayak/Github-projects/AI-Powered-Multi-Crop-Pesticide-Recommendation-System/data/vegetables/Eggplant"
+dst_train = "/Users/shreeganeshnayak/Github-projects/AI-Powered-Multi-Crop-Pesticide-Recommendation-System/data/vegetables/train/Eggplant"
+dst_val = "/Users/shreeganeshnayak/Github-projects/AI-Powered-Multi-Crop-Pesticide-Recommendation-System/data/vegetables/val/Eggplant"
 
-train_samples = 50
-val_samples = 15
+train_samples = 300
+val_samples = 75
 
 for class_name in os.listdir(src):
     class_path = os.path.join(src, class_name)
